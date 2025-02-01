@@ -21,15 +21,24 @@ var sampleConfig string
 type Aggregator struct {
 	Log telegraf.Logger `toml:"-"`
 
-	OutputNameSuffix      string          `toml:"output_name_suffix"`
-	ExcludeByLabels       []string        `toml:"exclude_by_labels"`
+	GroupWithoutLabels    []string        `toml:"group_without_labels"`
+	GroupByLabels         []string        `toml:"group_by_labels"`
 	LateSeriesGracePeriod config.Duration `toml:"late_series_grace_period"`
 	AggregationInterval   config.Duration `toml:"period"`
 
-	excludeByLabelsSet map[string]struct{}
-	deltaState         map[uint64]*DeltaAggregate
-	sumState           map[uint64]*SumAggregate
+	groupingMode      GroupingMode
+	groupingLabelsSet map[string]struct{}
+	deltaState        map[uint64]*DeltaAggregate
+	sumState          map[uint64]*SumAggregate
 }
+
+type GroupingMode int
+
+const (
+	None GroupingMode = iota
+	GroupBy
+	GroupWithout
+)
 
 type DeltaAggregate struct {
 	Name             string
@@ -55,8 +64,7 @@ func (*Aggregator) SampleConfig() string {
 
 func NewAggregator() *Aggregator {
 	a := &Aggregator{
-		OutputNameSuffix:      "",
-		ExcludeByLabels:       make([]string, 0),
+		GroupWithoutLabels:    make([]string, 0),
 		LateSeriesGracePeriod: config.Duration(5 * time.Minute),
 		AggregationInterval:   config.Duration(30 * time.Second),
 	}
@@ -65,17 +73,29 @@ func NewAggregator() *Aggregator {
 }
 
 func (a *Aggregator) Init() error {
-	if a.ExcludeByLabels == nil || len(a.ExcludeByLabels) == 0 {
-		return fmt.Errorf("exclude_by_labels must be set and non-empty")
-	} else {
-		a.excludeByLabelsSet = make(map[string]struct{})
-		for _, label := range a.ExcludeByLabels {
-			a.excludeByLabelsSet[label] = struct{}{}
+	hasGroupWithout := a.GroupWithoutLabels != nil && len(a.GroupWithoutLabels) > 0
+	hasGroupBy := a.GroupByLabels != nil && len(a.GroupByLabels) > 0
+	a.groupingLabelsSet = make(map[string]struct{})
+	if hasGroupWithout && hasGroupBy {
+		return fmt.Errorf("at most one of group_without_labels and group_by_labels may be set")
+	} else if hasGroupWithout {
+		a.groupingMode = GroupWithout
+		for _, label := range a.GroupWithoutLabels {
+			a.groupingLabelsSet[label] = struct{}{}
 		}
+	} else if hasGroupBy {
+		a.groupingMode = GroupBy
+		for _, label := range a.GroupByLabels {
+			a.groupingLabelsSet[label] = struct{}{}
+		}
+	} else {
+		a.groupingMode = None
 	}
+
 	a.deltaState = make(map[uint64]*DeltaAggregate)
 	a.sumState = make(map[uint64]*SumAggregate)
-	a.Log.Debug("dbcounter aggregator inited")
+
+	a.Log.Debug("dbcounter aggregator inited with grouping mode: ", a.groupingMode)
 	return nil
 }
 
@@ -100,7 +120,7 @@ func (a *Aggregator) Add(metric telegraf.Metric) {
 	if !found {
 		deltaAgg = &DeltaAggregate{
 			Name:             metricName,
-			Tags:             cloneTags(origTags, nil),
+			Tags:             cloneTags(origTags, None, nil),
 			LastValue:        -1, // counter never negative, we use negative to indicate uninitialized
 			ThisValue:        value,
 			SeenInLastWindow: true,
@@ -116,7 +136,7 @@ func (a *Aggregator) Add(metric telegraf.Metric) {
 
 	delta := computeDelta(deltaAgg.LastValue, deltaAgg.ThisValue)
 
-	newTags := cloneTags(origTags, a.excludeByLabelsSet)
+	newTags := cloneTags(origTags, a.groupingMode, a.groupingLabelsSet)
 	sumGroupID := generateGroupID(metricName, newTags)
 	sumAgg, found := a.sumState[sumGroupID]
 	if !found {
@@ -142,11 +162,10 @@ func (a *Aggregator) Push(acc telegraf.Accumulator) {
 		if !sumAgg.SeenInWindow {
 			continue
 		}
-		nameWithSuffix := sumAgg.Name + a.OutputNameSuffix
 		if sumAgg.FirstSeen {
-			acc.AddFields(nameWithSuffix, map[string]interface{}{"value": float64(0)}, sumAgg.Tags, now.Add(-time.Duration(a.AggregationInterval)/2))
+			acc.AddFields(sumAgg.Name, map[string]interface{}{"value": float64(0)}, sumAgg.Tags, now.Add(-time.Duration(a.AggregationInterval)/2))
 		}
-		acc.AddFields(nameWithSuffix, map[string]interface{}{"value": sumAgg.Value}, sumAgg.Tags, now)
+		acc.AddFields(sumAgg.Name, map[string]interface{}{"value": sumAgg.Value}, sumAgg.Tags, now)
 	}
 }
 
@@ -216,19 +235,28 @@ func convert(in interface{}) (float64, bool) {
 	}
 }
 
-func cloneTags(in map[string]string, drop map[string]struct{}) map[string]string {
+func cloneTags(in map[string]string, groupingMode GroupingMode, labelSet map[string]struct{}) map[string]string {
 	out := make(map[string]string, len(in))
-	if drop == nil {
+	if groupingMode == None {
 		for k, v := range in {
 			out[k] = v
 		}
-	} else {
+	} else if groupingMode == GroupWithout {
 		for k, v := range in {
-			if _, ok := drop[k]; ok {
+			if _, ok := labelSet[k]; ok {
 				continue
 			}
 			out[k] = v
 		}
+	} else if groupingMode == GroupBy {
+		for k, v := range in {
+			if _, ok := labelSet[k]; !ok {
+				continue
+			}
+			out[k] = v
+		}
+	} else {
+		panic("unexpected grouping mode")
 	}
 	return out
 }
