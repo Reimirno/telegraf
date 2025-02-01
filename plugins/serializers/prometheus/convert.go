@@ -121,6 +121,9 @@ func MetricName(measurement, fieldKey string, valueType telegraf.ValueType) stri
 	if measurement == "prometheus" {
 		return fieldKey
 	}
+	if fieldKey == "value" {
+		return measurement
+	}
 	return measurement + "_" + fieldKey
 }
 
