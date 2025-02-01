@@ -18,6 +18,19 @@ import (
 //go:embed sample.conf
 var sampleConfig string
 
+type Aggregator struct {
+	Log telegraf.Logger `toml:"-"`
+
+	deltaState            map[uint64]*DeltaAggregate `toml:"-"`
+	sumState              map[uint64]*SumAggregate   `toml:"-"`
+	outputNameSuffix      string                     `toml:"output_name_suffix"`
+	excludeByLabels       []string                   `toml:"exclude_by_labels"`
+	lateSeriesGracePeriod config.Duration            `toml:"late_series_grace_period"`
+	aggregationInterval   config.Duration            `toml:"period"`
+
+	excludeByLabelsSet map[string]struct{}
+}
+
 type DeltaAggregate struct {
 	Name             string
 	Tags             map[string]string
@@ -36,26 +49,16 @@ type SumAggregate struct {
 	Time         time.Time
 }
 
-type Aggregator struct {
-	deltaState          map[uint64]*DeltaAggregate `toml:"-"`
-	sumState            map[uint64]*SumAggregate   `toml:"-"`
-	outputNameSuffix    string                     `toml:"output_name_suffix"`
-	excludeByLabels     []string                   `toml:"exclude_by_labels"`
-	lateSeriesGrace     config.Duration            `toml:"late_series_grace"`
-	aggregationInterval config.Duration            `toml:"period"`
-	Log                 telegraf.Logger            `toml:"-"`
-}
-
 func (*Aggregator) SampleConfig() string {
 	return sampleConfig
 }
 
 func NewAggregator() *Aggregator {
 	a := &Aggregator{
-		outputNameSuffix:    "_dbcounter",
-		excludeByLabels:     make([]string, 0),
-		lateSeriesGrace:     config.Duration(5 * time.Minute),
-		aggregationInterval: config.Duration(30 * time.Second),
+		outputNameSuffix:      "_dbcounter",
+		excludeByLabels:       make([]string, 0),
+		lateSeriesGracePeriod: config.Duration(5 * time.Minute),
+		aggregationInterval:   config.Duration(30 * time.Second),
 	}
 	a.Reset()
 	return a
@@ -64,6 +67,11 @@ func NewAggregator() *Aggregator {
 func (a *Aggregator) Init() error {
 	if a.excludeByLabels == nil || len(a.excludeByLabels) == 0 {
 		return fmt.Errorf("exclude_by_labels must be set and non-empty")
+	} else {
+		a.excludeByLabelsSet = make(map[string]struct{})
+		for _, label := range a.excludeByLabels {
+			a.excludeByLabelsSet[label] = struct{}{}
+		}
 	}
 	a.deltaState = make(map[uint64]*DeltaAggregate)
 	a.sumState = make(map[uint64]*SumAggregate)
@@ -110,7 +118,7 @@ func (a *Aggregator) Add(metric telegraf.Metric) {
 
 	newTags := make(map[string]string)
 	for k, v := range tags {
-		if !contains(a.excludeByLabels, k) {
+		if _, ok := a.excludeByLabelsSet[k]; !ok {
 			newTags[k] = v
 		}
 	}
@@ -151,7 +159,7 @@ func (a *Aggregator) Push(acc telegraf.Accumulator) {
 func (a *Aggregator) Reset() {
 	now := time.Now()
 	for id, deltaAgg := range a.deltaState {
-		if now.Sub(deltaAgg.Time) > time.Duration(a.lateSeriesGrace) {
+		if now.Sub(deltaAgg.Time) > time.Duration(a.lateSeriesGracePeriod) {
 			delete(a.deltaState, id)
 			continue
 		}
@@ -159,7 +167,7 @@ func (a *Aggregator) Reset() {
 	}
 
 	for id, sumAgg := range a.sumState {
-		if now.Sub(sumAgg.Time) > time.Duration(a.lateSeriesGrace) {
+		if now.Sub(sumAgg.Time) > time.Duration(a.lateSeriesGracePeriod) {
 			delete(a.sumState, id)
 			continue
 		}
@@ -210,15 +218,6 @@ func convert(in interface{}) (float64, bool) {
 	default:
 		return 0, false
 	}
-}
-
-func contains(slice []string, value string) bool {
-	for _, v := range slice {
-		if v == value {
-			return true
-		}
-	}
-	return false
 }
 
 func init() {
