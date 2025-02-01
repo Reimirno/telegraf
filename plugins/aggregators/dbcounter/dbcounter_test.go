@@ -79,6 +79,135 @@ func TestSimple(t *testing.T) {
 	}
 }
 
+func TestMultipleWindows(t *testing.T) {
+	testCases := []testCase{
+		{
+			name:        "multiple windows",
+			description: "should calculate deltas across multiple windows",
+			windows: []testAggregationWindow{
+				{
+					metricsInput: []telegraf.Metric{
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node1"},
+							map[string]interface{}{"value": float64(1)},
+							timeFromOffset(0)),
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node1"},
+							map[string]interface{}{"value": float64(3)},
+							timeFromOffset(1)),
+					},
+					expectedMetricsOutput: []telegraf.Metric{
+						metric.New("m1_dbcounter",
+							map[string]string{"foo": "bar"},
+							map[string]interface{}{"value": float64(0)},
+							timeFromOffset(0)),
+						metric.New("m1_dbcounter",
+							map[string]string{"foo": "bar"},
+							map[string]interface{}{"value": float64(2)},
+							timeFromOffset(0)),
+					},
+				},
+				{
+					metricsInput: []telegraf.Metric{
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node1"},
+							map[string]interface{}{"value": float64(7)},
+							timeFromOffset(2)),
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node1"},
+							map[string]interface{}{"value": float64(15)},
+							timeFromOffset(3)),
+					},
+					expectedMetricsOutput: []telegraf.Metric{
+						metric.New("m1_dbcounter",
+							map[string]string{"foo": "bar"},
+							map[string]interface{}{"value": float64(14)},
+							timeFromOffset(2)),
+					},
+				},
+			},
+		},
+		{
+			name:        "multiple windows multiple nodes",
+			description: "should calculate deltas across multiple windows with multiple nodes",
+			windows: []testAggregationWindow{
+				{
+					metricsInput: []telegraf.Metric{
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node1"},
+							map[string]interface{}{"value": float64(1)},
+							timeFromOffset(0)),
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node2"},
+							map[string]interface{}{"value": float64(2)},
+							timeFromOffset(0)),
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node1"},
+							map[string]interface{}{"value": float64(3)},
+							timeFromOffset(1)),
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node2"},
+							map[string]interface{}{"value": float64(4)},
+							timeFromOffset(1)),
+					},
+					expectedMetricsOutput: []telegraf.Metric{
+						metric.New("m1_dbcounter",
+							map[string]string{"foo": "bar"},
+							map[string]interface{}{"value": float64(0)},
+							timeFromOffset(0)),
+						metric.New("m1_dbcounter",
+							map[string]string{"foo": "bar"},
+							map[string]interface{}{"value": float64(4)},
+							timeFromOffset(0)),
+					},
+				},
+				{
+					metricsInput: []telegraf.Metric{
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node1"},
+							map[string]interface{}{"value": float64(7)},
+							timeFromOffset(2)),
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node2"},
+							map[string]interface{}{"value": float64(8)},
+							timeFromOffset(2)),
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node1"},
+							map[string]interface{}{"value": float64(9)},
+							timeFromOffset(3)),
+						metric.New("m1",
+							map[string]string{"foo": "bar", "dbletNode": "node2"},
+							map[string]interface{}{"value": float64(10)},
+							timeFromOffset(3)),
+					},
+					expectedMetricsOutput: []telegraf.Metric{
+						metric.New("m1_dbcounter",
+							map[string]string{"foo": "bar"},
+							map[string]interface{}{"value": float64(16)},
+							timeFromOffset(2)),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			acc := &testutil.Accumulator{}
+			agg := newAggregator(t)
+
+			for _, window := range tc.windows {
+				for _, m := range window.metricsInput {
+					agg.Add(m)
+				}
+				agg.Push(acc)
+
+				check(t, acc, window.expectedMetricsOutput)
+			}
+		})
+	}
+}
+
 func TestDeltaEdgeCases(t *testing.T) {
 	testCases := []testCase{
 		{
@@ -175,7 +304,7 @@ func TestDeltaEdgeCases(t *testing.T) {
 		},
 		{
 			name:        "real counter reset across two windows",
-			description: "should inject a 0",
+			description: "should not do negative delta",
 			windows: []testAggregationWindow{
 				{
 					metricsInput: []telegraf.Metric{
