@@ -23,7 +23,7 @@ type Aggregator struct {
 
 	GroupWithoutLabels    []string        `toml:"group_without_labels"`
 	GroupByLabels         []string        `toml:"group_by_labels"`
-	LateSeriesGracePeriod config.Duration `toml:"late_series_grace_period"`
+	LateSeriesGracePeriod config.Duration `toml:"grace"` // directly take value from generic grace and period config
 	AggregationInterval   config.Duration `toml:"period"`
 
 	groupingMode      GroupingMode
@@ -95,7 +95,8 @@ func (a *Aggregator) Init() error {
 	a.deltaState = make(map[uint64]*DeltaAggregate)
 	a.sumState = make(map[uint64]*SumAggregate)
 
-	a.Log.Debug("dbcounter aggregator inited with grouping mode: ", a.groupingMode)
+	a.Log.Debugf("dbcounter aggregator inited. period=%v, grace=%v, groupingMode=%d, groupingLabelsSet=%v",
+		a.AggregationInterval, a.LateSeriesGracePeriod, a.groupingMode, a.groupingLabelsSet)
 	return nil
 }
 

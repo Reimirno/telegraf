@@ -74,8 +74,8 @@ func TestSimple(t *testing.T) {
 					agg.Add(m)
 				}
 				agg.Push(acc)
-
 				check(t, acc, window.expectedMetricsOutput)
+				agg.Reset()
 			}
 		})
 	}
@@ -203,8 +203,8 @@ func TestMultipleWindows(t *testing.T) {
 					agg.Add(m)
 				}
 				agg.Push(acc)
-
 				check(t, acc, window.expectedMetricsOutput)
+				agg.Reset()
 			}
 		})
 	}
@@ -366,8 +366,8 @@ func TestDeltaEdgeCases(t *testing.T) {
 					agg.Add(m)
 				}
 				agg.Push(acc)
-
 				check(t, acc, window.expectedMetricsOutput)
+				agg.Reset()
 			}
 		})
 	}
@@ -423,8 +423,8 @@ func TestLabelDropping(t *testing.T) {
 					agg.Add(m)
 				}
 				agg.Push(acc)
-
 				check(t, acc, window.expectedMetricsOutput)
+				agg.Reset()
 			}
 		})
 	}
