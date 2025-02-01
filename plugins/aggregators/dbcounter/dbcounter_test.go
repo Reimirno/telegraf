@@ -22,7 +22,10 @@ type testAggregationWindow struct {
 }
 
 const (
-	startOfTheWorld = 1530939936
+	startOfTheWorld  = 1530939936
+	outputNameSuffix = "_dbcounter"
+	excludeByLabel   = "dbletNode"
+	testMeasurement  = "m1"
 )
 
 func TestSimple(t *testing.T) {
@@ -33,25 +36,25 @@ func TestSimple(t *testing.T) {
 			windows: []testAggregationWindow{
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(1)},
 							timeFromOffset(0)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(2)},
 							timeFromOffset(1)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(3)},
 							timeFromOffset(2)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(0)},
 							timeFromOffset(0)),
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(2)},
 							timeFromOffset(0)),
@@ -87,21 +90,21 @@ func TestMultipleWindows(t *testing.T) {
 			windows: []testAggregationWindow{
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(1)},
 							timeFromOffset(0)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(3)},
 							timeFromOffset(1)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(0)},
 							timeFromOffset(0)),
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(2)},
 							timeFromOffset(0)),
@@ -109,17 +112,17 @@ func TestMultipleWindows(t *testing.T) {
 				},
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(7)},
 							timeFromOffset(2)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(15)},
 							timeFromOffset(3)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(14)},
 							timeFromOffset(2)),
@@ -133,29 +136,29 @@ func TestMultipleWindows(t *testing.T) {
 			windows: []testAggregationWindow{
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(1)},
 							timeFromOffset(0)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node2"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node2"},
 							map[string]interface{}{"value": float64(2)},
 							timeFromOffset(0)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(3)},
 							timeFromOffset(1)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node2"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node2"},
 							map[string]interface{}{"value": float64(4)},
 							timeFromOffset(1)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(0)},
 							timeFromOffset(0)),
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(4)},
 							timeFromOffset(0)),
@@ -163,25 +166,25 @@ func TestMultipleWindows(t *testing.T) {
 				},
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(7)},
 							timeFromOffset(2)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node2"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node2"},
 							map[string]interface{}{"value": float64(8)},
 							timeFromOffset(2)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(9)},
 							timeFromOffset(3)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node2"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node2"},
 							map[string]interface{}{"value": float64(10)},
 							timeFromOffset(3)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(16)},
 							timeFromOffset(2)),
@@ -216,17 +219,17 @@ func TestDeltaEdgeCases(t *testing.T) {
 			windows: []testAggregationWindow{
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(999)},
 							timeFromOffset(0)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(0)},
 							time.Unix(0, 0)),
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(0)},
 							time.Unix(0, 0)),
@@ -240,25 +243,25 @@ func TestDeltaEdgeCases(t *testing.T) {
 			windows: []testAggregationWindow{
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(9)},
 							timeFromOffset(0)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node2"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node2"},
 							map[string]interface{}{"value": float64(99)},
 							timeFromOffset(1)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node3"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node3"},
 							map[string]interface{}{"value": float64(999)},
 							timeFromOffset(2)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(0)},
 							timeFromOffset(0)),
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(0)},
 							timeFromOffset(0)),
@@ -272,29 +275,29 @@ func TestDeltaEdgeCases(t *testing.T) {
 			windows: []testAggregationWindow{
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(99)},
 							timeFromOffset(0)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(100)},
 							timeFromOffset(1)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(3)},
 							timeFromOffset(2)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(5)},
 							timeFromOffset(3)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(0)},
 							timeFromOffset(0)),
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64((100 - 99) + (5 - 3))},
 							timeFromOffset(0)),
@@ -308,21 +311,21 @@ func TestDeltaEdgeCases(t *testing.T) {
 			windows: []testAggregationWindow{
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(99)},
 							timeFromOffset(0)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(100)},
 							timeFromOffset(1)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(0)},
 							timeFromOffset(0)),
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(100 - 99)},
 							timeFromOffset(0)),
@@ -330,21 +333,21 @@ func TestDeltaEdgeCases(t *testing.T) {
 				},
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(101)},
 							timeFromOffset(2)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(4)},
 							timeFromOffset(3)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(5)},
 							timeFromOffset(4)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64((100 - 99) + (101 - 100) + 0 + (5 - 4))},
 							timeFromOffset(0)),
@@ -379,29 +382,29 @@ func TestLabelDropping(t *testing.T) {
 			windows: []testAggregationWindow{
 				{
 					metricsInput: []telegraf.Metric{
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(1)},
 							timeFromOffset(0)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node1"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node1"},
 							map[string]interface{}{"value": float64(2)},
 							timeFromOffset(0)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node2"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node2"},
 							map[string]interface{}{"value": float64(3)},
 							timeFromOffset(1)),
-						metric.New("m1",
-							map[string]string{"foo": "bar", "dbletNode": "node2"},
+						metric.New(testMeasurement,
+							map[string]string{"foo": "bar", excludeByLabel: "node2"},
 							map[string]interface{}{"value": float64(4)},
 							timeFromOffset(2)),
 					},
 					expectedMetricsOutput: []telegraf.Metric{
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(0)},
 							timeFromOffset(0)),
-						metric.New("m1_dbcounter",
+						metric.New(testMeasurement+outputNameSuffix,
 							map[string]string{"foo": "bar"},
 							map[string]interface{}{"value": float64(2)},
 							timeFromOffset(0)),
@@ -430,8 +433,8 @@ func TestLabelDropping(t *testing.T) {
 
 func newAggregator(t *testing.T) *Aggregator {
 	agg := NewAggregator()
-	agg.outputNameSuffix = "_dbcounter"
-	agg.excludeByLabels = []string{"dbletNode"}
+	agg.OutputNameSuffix = outputNameSuffix
+	agg.ExcludeByLabels = []string{excludeByLabel}
 	agg.Log = testutil.Logger{}
 
 	require.NoError(t, agg.Init())
