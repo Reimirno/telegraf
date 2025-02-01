@@ -55,7 +55,7 @@ func (*Aggregator) SampleConfig() string {
 
 func NewAggregator() *Aggregator {
 	a := &Aggregator{
-		outputNameSuffix:      "_dbcounter",
+		outputNameSuffix:      "",
 		excludeByLabels:       make([]string, 0),
 		lateSeriesGracePeriod: config.Duration(5 * time.Minute),
 		aggregationInterval:   config.Duration(30 * time.Second),
