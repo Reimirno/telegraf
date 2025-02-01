@@ -202,6 +202,7 @@ func generateGroupID(name string, tags map[string]string) uint64 {
 	return h.Sum64()
 }
 
+// Every aggregator has this convert func, we just steal it from other implementations
 func convert(in interface{}) (float64, bool) {
 	switch v := in.(type) {
 	case float64:
