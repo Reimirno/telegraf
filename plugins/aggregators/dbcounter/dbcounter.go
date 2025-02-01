@@ -21,14 +21,14 @@ var sampleConfig string
 type Aggregator struct {
 	Log telegraf.Logger `toml:"-"`
 
-	deltaState            map[uint64]*DeltaAggregate `toml:"-"`
-	sumState              map[uint64]*SumAggregate   `toml:"-"`
-	outputNameSuffix      string                     `toml:"output_name_suffix"`
-	excludeByLabels       []string                   `toml:"exclude_by_labels"`
-	lateSeriesGracePeriod config.Duration            `toml:"late_series_grace_period"`
-	aggregationInterval   config.Duration            `toml:"period"`
+	OutputNameSuffix      string          `toml:"output_name_suffix"`
+	ExcludeByLabels       []string        `toml:"exclude_by_labels"`
+	LateSeriesGracePeriod config.Duration `toml:"late_series_grace_period"`
+	AggregationInterval   config.Duration `toml:"period"`
 
 	excludeByLabelsSet map[string]struct{}
+	deltaState         map[uint64]*DeltaAggregate
+	sumState           map[uint64]*SumAggregate
 }
 
 type DeltaAggregate struct {
@@ -55,21 +55,21 @@ func (*Aggregator) SampleConfig() string {
 
 func NewAggregator() *Aggregator {
 	a := &Aggregator{
-		outputNameSuffix:      "",
-		excludeByLabels:       make([]string, 0),
-		lateSeriesGracePeriod: config.Duration(5 * time.Minute),
-		aggregationInterval:   config.Duration(30 * time.Second),
+		OutputNameSuffix:      "",
+		ExcludeByLabels:       make([]string, 0),
+		LateSeriesGracePeriod: config.Duration(5 * time.Minute),
+		AggregationInterval:   config.Duration(30 * time.Second),
 	}
 	a.Reset()
 	return a
 }
 
 func (a *Aggregator) Init() error {
-	if a.excludeByLabels == nil || len(a.excludeByLabels) == 0 {
+	if a.ExcludeByLabels == nil || len(a.ExcludeByLabels) == 0 {
 		return fmt.Errorf("exclude_by_labels must be set and non-empty")
 	} else {
 		a.excludeByLabelsSet = make(map[string]struct{})
-		for _, label := range a.excludeByLabels {
+		for _, label := range a.ExcludeByLabels {
 			a.excludeByLabelsSet[label] = struct{}{}
 		}
 	}
@@ -142,9 +142,9 @@ func (a *Aggregator) Push(acc telegraf.Accumulator) {
 		if !sumAgg.SeenInWindow {
 			continue
 		}
-		nameWithSuffix := sumAgg.Name + a.outputNameSuffix
+		nameWithSuffix := sumAgg.Name + a.OutputNameSuffix
 		if sumAgg.FirstSeen {
-			acc.AddFields(nameWithSuffix, map[string]interface{}{"value": float64(0)}, sumAgg.Tags, now.Add(-time.Duration(a.aggregationInterval)/2))
+			acc.AddFields(nameWithSuffix, map[string]interface{}{"value": float64(0)}, sumAgg.Tags, now.Add(-time.Duration(a.AggregationInterval)/2))
 		}
 		acc.AddFields(nameWithSuffix, map[string]interface{}{"value": sumAgg.Value}, sumAgg.Tags, now)
 	}
@@ -153,7 +153,7 @@ func (a *Aggregator) Push(acc telegraf.Accumulator) {
 func (a *Aggregator) Reset() {
 	now := time.Now()
 	for id, deltaAgg := range a.deltaState {
-		if now.Sub(deltaAgg.Time) > time.Duration(a.lateSeriesGracePeriod) {
+		if now.Sub(deltaAgg.Time) > time.Duration(a.LateSeriesGracePeriod) {
 			delete(a.deltaState, id)
 			continue
 		}
@@ -161,7 +161,7 @@ func (a *Aggregator) Reset() {
 	}
 
 	for id, sumAgg := range a.sumState {
-		if now.Sub(sumAgg.Time) > time.Duration(a.lateSeriesGracePeriod) {
+		if now.Sub(sumAgg.Time) > time.Duration(a.LateSeriesGracePeriod) {
 			delete(a.sumState, id)
 			continue
 		}
