@@ -94,14 +94,14 @@ func (a *Aggregator) Add(metric telegraf.Metric) {
 	}
 
 	metricName := metric.Name()
-	tags := metric.Tags()
-	deltaGroupID := generateGroupID(metricName, tags)
+	origTags := metric.Tags()
+	deltaGroupID := generateGroupID(metricName, origTags)
 	deltaAgg, found := a.deltaState[deltaGroupID]
 	if !found {
 		deltaAgg = &DeltaAggregate{
 			Name:             metricName,
-			Tags:             tags, // TODO: deep copy tags
-			LastValue:        -1,   // counter never negative, we use negative to indicate uninitialized
+			Tags:             cloneTags(origTags, nil),
+			LastValue:        -1, // counter never negative, we use negative to indicate uninitialized
 			ThisValue:        value,
 			SeenInLastWindow: true,
 			Time:             metric.Time(),
@@ -116,13 +116,7 @@ func (a *Aggregator) Add(metric telegraf.Metric) {
 
 	delta := computeDelta(deltaAgg.LastValue, deltaAgg.ThisValue)
 
-	newTags := make(map[string]string)
-	for k, v := range tags {
-		if _, ok := a.excludeByLabelsSet[k]; !ok {
-			newTags[k] = v
-		}
-	}
-
+	newTags := cloneTags(origTags, a.excludeByLabelsSet)
 	sumGroupID := generateGroupID(metricName, newTags)
 	sumAgg, found := a.sumState[sumGroupID]
 	if !found {
@@ -188,22 +182,23 @@ func computeDelta(last, current float64) float64 {
 }
 
 func generateGroupID(name string, tags map[string]string) uint64 {
-	h := fnv.New64a()     // Initialize FNV-1a hasher
-	h.Write([]byte(name)) // Hash metric name
-
 	sortedKeys := make([]string, 0, len(tags))
 	for k := range tags {
 		sortedKeys = append(sortedKeys, k)
 	}
 	sort.Strings(sortedKeys) // Ensure consistent ordering
 
+	h := fnv.New64a() // Initialize FNV-1a hasher
+
+	// Write never fails for FNV-1a, check source code
+	h.Write([]byte(name)) // Hash metric name
+	h.Write([]byte(";"))  // Separator for safety
 	for _, k := range sortedKeys {
 		h.Write([]byte(k))       // Hash tag key
-		h.Write([]byte("="))     // Separator
+		h.Write([]byte("="))     // Separator for safety
 		h.Write([]byte(tags[k])) // Hash tag value
 		h.Write([]byte(";"))     // Separator for safety
 	}
-
 	return h.Sum64()
 }
 
@@ -218,6 +213,23 @@ func convert(in interface{}) (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func cloneTags(in map[string]string, drop map[string]struct{}) map[string]string {
+	out := make(map[string]string, len(in))
+	if drop == nil {
+		for k, v := range in {
+			out[k] = v
+		}
+	} else {
+		for k, v := range in {
+			if _, ok := drop[k]; ok {
+				continue
+			}
+			out[k] = v
+		}
+	}
+	return out
 }
 
 func init() {
